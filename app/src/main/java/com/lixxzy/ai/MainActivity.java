@@ -64,34 +64,6 @@ public class MainActivity extends Activity {
                 }
             });
         }
-
-        @JavascriptInterface
-        public void setTransparency(int value) {
-            runOnUiThread(() -> {
-                int percent = Math.max(1, Math.min(100, value));
-
-                // 1% = jelas, 100% = transparan
-                int alpha = Math.round(
-                        255f * (100 - percent) / 99f
-                );
-
-                alpha = Math.max(1, Math.min(255, alpha));
-
-                Intent intent = new Intent(
-                        MainActivity.this,
-                        FloatingService.class
-                );
-
-                intent.setAction("UPDATE_ALPHA");
-                intent.putExtra("alpha", alpha);
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent);
-                } else {
-                    startService(intent);
-                }
-            });
-        }
     }
 
     private void enableFloating() {
@@ -171,5 +143,4 @@ public class MainActivity extends Activity {
 
         super.onDestroy();
     }
-            }
-                
+}
