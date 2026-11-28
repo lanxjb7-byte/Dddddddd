@@ -1,3 +1,4 @@
+
 package com.lixxzy.ai;
 
 import android.app.Service;
@@ -16,6 +17,8 @@ import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebChromeClient;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -36,6 +39,7 @@ public class FloatingService extends Service {
     private boolean panelOpen = false;
     private boolean maximized = false;
 
+    // Nilai alpha: 255 = jelas, 1 = hampir transparan
     private int alphaValue = 255;
 
     @Override
@@ -64,7 +68,7 @@ public class FloatingService extends Service {
                 && "UPDATE_ALPHA".equals(intent.getAction())) {
 
             alphaValue = intent.getIntExtra("alpha", 255);
-            alphaValue = Math.max(30, Math.min(255, alphaValue));
+            alphaValue = Math.max(1, Math.min(255, alphaValue));
 
             updateAlpha();
         }
@@ -79,7 +83,15 @@ public class FloatingService extends Service {
         );
     }
 
-    private GradientDrawable createBackground(
+    private int getOverlayType() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        }
+
+        return WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
+    private GradientDrawable roundedBackground(
             String color,
             int radius
     ) {
@@ -89,21 +101,24 @@ public class FloatingService extends Service {
         return drawable;
     }
 
-    private int getOverlayType() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            return WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        }
+    private ImageView createLogo() {
+        ImageView image = new ImageView(this);
 
-        return WindowManager.LayoutParams.TYPE_PHONE;
+        image.setImageResource(R.drawable.lixxzy_logo);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        image.setAdjustViewBounds(true);
+        image.setPadding(dp(3), dp(3), dp(3), dp(3));
+
+        return image;
     }
 
     private void createBubble() {
         if (bubble != null) return;
 
-        bubble = new ImageView(this);
-        bubble.setImageResource(R.drawable.lixxzy_logo);
-        bubble.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        bubble.setBackground(createBackground("#171717", 100));
+        bubble = createLogo();
+        bubble.setBackground(
+                roundedBackground("#171717", 100)
+        );
         bubble.setClipToOutline(true);
         bubble.setElevation(dp(8));
 
@@ -127,10 +142,7 @@ public class FloatingService extends Service {
             private float touchY;
 
             @Override
-            public boolean onTouch(
-                    View view,
-                    MotionEvent event
-            ) {
+            public boolean onTouch(View view, MotionEvent event) {
                 switch (event.getAction()) {
 
                     case MotionEvent.ACTION_DOWN:
@@ -141,11 +153,11 @@ public class FloatingService extends Service {
                         return true;
 
                     case MotionEvent.ACTION_MOVE:
-                        bubbleParams.x = startX
-                                + (int) (event.getRawX() - touchX);
+                        bubbleParams.x = startX +
+                                (int) (event.getRawX() - touchX);
 
-                        bubbleParams.y = startY
-                                + (int) (event.getRawY() - touchY);
+                        bubbleParams.y = startY +
+                                (int) (event.getRawY() - touchY);
 
                         windowManager.updateViewLayout(
                                 bubble,
@@ -154,13 +166,8 @@ public class FloatingService extends Service {
                         return true;
 
                     case MotionEvent.ACTION_UP:
-                        float dx = Math.abs(
-                                event.getRawX() - touchX
-                        );
-
-                        float dy = Math.abs(
-                                event.getRawY() - touchY
-                        );
+                        float dx = Math.abs(event.getRawX() - touchX);
+                        float dy = Math.abs(event.getRawY() - touchY);
 
                         if (dx < dp(8) && dy < dp(8)) {
                             togglePanel();
@@ -191,81 +198,13 @@ public class FloatingService extends Service {
 
         panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackground(createBackground("#151515", 18));
+        panel.setBackground(
+                roundedBackground("#151515", 18)
+        );
         panel.setClipToOutline(true);
         panel.setElevation(dp(10));
 
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(
-                dp(12),
-                dp(8),
-                dp(8),
-                dp(8)
-        );
-        header.setBackgroundColor(Color.rgb(30, 30, 30));
-
-        ImageView logo = new ImageView(this);
-        logo.setImageResource(R.drawable.lixxzy_logo);
-        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-
-        header.addView(
-                logo,
-                new LinearLayout.LayoutParams(
-                        dp(32),
-                        dp(32)
-                )
-        );
-
-        TextView title = new TextView(this);
-        title.setText("LIXXZY AI");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(15);
-        title.setTypeface(null, 1);
-        title.setPadding(dp(10), 0, 0, 0);
-
-        header.addView(
-                title,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(40),
-                        1
-                )
-        );
-
-        TextView maximize = new TextView(this);
-        maximize.setText("↗");
-        maximize.setTextColor(Color.WHITE);
-        maximize.setTextSize(23);
-        maximize.setGravity(Gravity.CENTER);
-
-        header.addView(
-                maximize,
-                new LinearLayout.LayoutParams(
-                        dp(42),
-                        dp(42)
-                )
-        );
-
-        maximize.setOnClickListener(v -> toggleMaximize());
-
-        TextView close = new TextView(this);
-        close.setText("×");
-        close.setTextColor(Color.WHITE);
-        close.setTextSize(25);
-        close.setGravity(Gravity.CENTER);
-
-        header.addView(
-                close,
-                new LinearLayout.LayoutParams(
-                        dp(38),
-                        dp(42)
-                )
-        );
-
-        close.setOnClickListener(v -> closePanel());
-
-        panel.addView(header);
+        createHeader();
 
         panelWebView = new WebView(this);
 
@@ -274,14 +213,11 @@ public class FloatingService extends Service {
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
 
-        panelWebView.setWebViewClient(
-                new android.webkit.WebViewClient()
-        );
-
-        panelWebView.setWebChromeClient(
-                new android.webkit.WebChromeClient()
-        );
+        panelWebView.setWebViewClient(new WebViewClient());
+        panelWebView.setWebChromeClient(new WebChromeClient());
 
         panelWebView.loadUrl("https://lixxzy-ai.netlify.app");
 
@@ -304,9 +240,65 @@ public class FloatingService extends Service {
         );
 
         panelParams.gravity = Gravity.CENTER;
+
+        // Terapkan transparansi terbaru saat panel dibuka
         panelParams.alpha = alphaValue / 255f;
 
         windowManager.addView(panel, panelParams);
+    }
+
+    private void createHeader() {
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(8), dp(8), dp(8));
+        header.setBackgroundColor(Color.rgb(30, 30, 30));
+
+        ImageView logo = createLogo();
+
+        header.addView(
+                logo,
+                new LinearLayout.LayoutParams(dp(36), dp(36))
+        );
+
+        TextView title = new TextView(this);
+        title.setText("Lixxzy AI");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(15);
+        title.setTypeface(null, 1);
+        title.setPadding(dp(10), 0, 0, 0);
+
+        header.addView(
+                title,
+                new LinearLayout.LayoutParams(0, dp(42), 1)
+        );
+
+        TextView maximize = new TextView(this);
+        maximize.setText("↗");
+        maximize.setTextColor(Color.WHITE);
+        maximize.setTextSize(23);
+        maximize.setGravity(Gravity.CENTER);
+
+        header.addView(
+                maximize,
+                new LinearLayout.LayoutParams(dp(42), dp(42))
+        );
+
+        maximize.setOnClickListener(v -> toggleMaximize());
+
+        TextView close = new TextView(this);
+        close.setText("×");
+        close.setTextColor(Color.WHITE);
+        close.setTextSize(25);
+        close.setGravity(Gravity.CENTER);
+
+        header.addView(
+                close,
+                new LinearLayout.LayoutParams(dp(38), dp(42))
+        );
+
+        close.setOnClickListener(v -> closePanel());
+
+        panel.addView(header);
     }
 
     private void toggleMaximize() {
@@ -315,8 +307,8 @@ public class FloatingService extends Service {
         maximized = !maximized;
 
         if (maximized) {
-            panelParams.width = -1;
-            panelParams.height = -1;
+            panelParams.width = WindowManager.LayoutParams.MATCH_PARENT;
+            panelParams.height = WindowManager.LayoutParams.MATCH_PARENT;
         } else {
             panelParams.width = dp(340);
             panelParams.height = dp(540);
@@ -324,10 +316,7 @@ public class FloatingService extends Service {
 
         panelParams.gravity = Gravity.CENTER;
 
-        windowManager.updateViewLayout(
-                panel,
-                panelParams
-        );
+        windowManager.updateViewLayout(panel, panelParams);
     }
 
     private void updateAlpha() {
@@ -359,16 +348,14 @@ public class FloatingService extends Service {
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-            NotificationChannel channel =
-                    new NotificationChannel(
-                            CHANNEL_ID,
-                            "LIXXZY Floating Window",
-                            NotificationManager.IMPORTANCE_LOW
-                    );
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Lixxzy Floating Window",
+                    NotificationManager.IMPORTANCE_LOW
+            );
 
             channel.setDescription(
-                    "Notifikasi jendela mengambang LIXXZY AI"
+                    "Jendela mengambang Lixxzy AI"
             );
 
             NotificationManager manager =
@@ -380,9 +367,8 @@ public class FloatingService extends Service {
 
     private Notification createNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
             return new Notification.Builder(this, CHANNEL_ID)
-                    .setContentTitle("LIXXZY AI")
+                    .setContentTitle("Lixxzy AI")
                     .setContentText("Jendela mengambang aktif")
                     .setSmallIcon(R.drawable.lixxzy_logo)
                     .setOngoing(true)
@@ -390,7 +376,7 @@ public class FloatingService extends Service {
         }
 
         return new Notification.Builder(this)
-                .setContentTitle("LIXXZY AI")
+                .setContentTitle("Lixxzy AI")
                 .setContentText("Jendela mengambang aktif")
                 .setSmallIcon(R.drawable.lixxzy_logo)
                 .setOngoing(true)
@@ -413,5 +399,5 @@ public class FloatingService extends Service {
     public IBinder onBind(Intent intent) {
         return null;
     }
-                }
-                                 
+                                            }
+            
