@@ -39,9 +39,6 @@ public class FloatingService extends Service {
     private boolean panelOpen = false;
     private boolean maximized = false;
 
-    // Nilai alpha: 255 = jelas, 1 = hampir transparan
-    private int alphaValue = 255;
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -64,23 +61,12 @@ public class FloatingService extends Service {
             int flags,
             int startId
     ) {
-        if (intent != null
-                && "UPDATE_ALPHA".equals(intent.getAction())) {
-
-            alphaValue = intent.getIntExtra("alpha", 255);
-            alphaValue = Math.max(1, Math.min(255, alphaValue));
-
-            updateAlpha();
-        }
-
         return START_STICKY;
     }
 
     private int dp(float value) {
-        return (int) (
-                value * getResources()
-                        .getDisplayMetrics().density
-        );
+        return (int) (value * getResources()
+                .getDisplayMetrics().density);
     }
 
     private int getOverlayType() {
@@ -133,6 +119,7 @@ public class FloatingService extends Service {
         bubbleParams.gravity = Gravity.TOP | Gravity.START;
         bubbleParams.x = dp(20);
         bubbleParams.y = dp(180);
+        bubbleParams.alpha = 1.0f;
 
         bubble.setOnTouchListener(new View.OnTouchListener() {
 
@@ -236,13 +223,11 @@ public class FloatingService extends Service {
                 getOverlayType(),
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT
+                PixelFormat.OPAQUE
         );
 
         panelParams.gravity = Gravity.CENTER;
-
-        // Terapkan transparansi terbaru saat panel dibuka
-        panelParams.alpha = alphaValue / 255f;
+        panelParams.alpha = 1.0f;
 
         windowManager.addView(panel, panelParams);
     }
@@ -261,7 +246,7 @@ public class FloatingService extends Service {
         );
 
         TextView title = new TextView(this);
-        title.setText("Lixxzy AI");
+        title.setText("LIXXZY AI");
         title.setTextColor(Color.WHITE);
         title.setTextSize(15);
         title.setTypeface(null, 1);
@@ -315,19 +300,9 @@ public class FloatingService extends Service {
         }
 
         panelParams.gravity = Gravity.CENTER;
+        panelParams.alpha = 1.0f;
 
         windowManager.updateViewLayout(panel, panelParams);
-    }
-
-    private void updateAlpha() {
-        if (panel != null && panelParams != null) {
-            panelParams.alpha = alphaValue / 255f;
-
-            windowManager.updateViewLayout(
-                    panel,
-                    panelParams
-            );
-        }
     }
 
     private void closePanel() {
@@ -350,7 +325,7 @@ public class FloatingService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Lixxzy Floating Window",
+                    "Lixzzy Floating Window",
                     NotificationManager.IMPORTANCE_LOW
             );
 
@@ -399,5 +374,5 @@ public class FloatingService extends Service {
     public IBinder onBind(Intent intent) {
         return null;
     }
-                                            }
+            }
             
