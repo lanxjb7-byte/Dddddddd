@@ -1,3 +1,4 @@
+
 package com.lixxzy.ai;
 
 import android.app.Activity;
@@ -14,75 +15,155 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
-    public static final String SITE = "https://lixxzy-ai.netlify.app";
-    private static final int OVERLAY_REQUEST = 701;
-    private WebView web;
-    private boolean enableAfterPermission = false;
 
-    @Override public void onCreate(Bundle savedInstanceState) {
+    private static final int OVERLAY_REQUEST = 1001;
+    private static final String WEBSITE =
+            "https://lixxzy-ai.netlify.app";
+
+    private WebView webView;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        web = new WebView(this);
-        WebSettings s = web.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        s.setSupportZoom(false);
-        s.setBuiltInZoomControls(false);
-        s.setDisplayZoomControls(false);
-        web.setWebViewClient(new WebViewClient());
-        web.setWebChromeClient(new WebChromeClient());
-        web.addJavascriptInterface(new AndroidBridge(), "LixxzyAndroid");
-        setContentView(web);
-        web.loadUrl(SITE);
+
+        webView = new WebView(this);
+        setContentView(webView);
+
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+
+        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebViewClient(new WebViewClient());
+
+        webView.addJavascriptInterface(
+                new AndroidBridge(),
+                "LixxzyAndroid"
+        );
+
+        webView.loadUrl(WEBSITE);
     }
 
     public class AndroidBridge {
-        @JavascriptInterface public void setFloatingEnabled(boolean enabled) {
+
+        @JavascriptInterface
+        public void setFloating(boolean enabled) {
             runOnUiThread(() -> {
-                if (enabled) enableFloating(); else stopFloating();
+                if (enabled) {
+                    enableFloating();
+                } else {
+                    stopService(new Intent(
+                            MainActivity.this,
+                            FloatingService.class
+                    ));
+                }
             });
         }
-        @JavascriptInterface public void setTransparency(int value) {
-            int v = Math.max(1, Math.min(100, value));
-            getSharedPreferences("lixxzy", MODE_PRIVATE).edit().putInt("transparency", v).apply();
-            Intent i = new Intent(MainActivity.this, FloatingService.class);
-            i.setAction(FloatingService.ACTION_TRANSPARENCY);
-            i.putExtra("value", v);
-            try { startService(i); } catch (Exception ignored) { }
+
+        @JavascriptInterface
+        public void setTransparency(int value) {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(
+                        MainActivity.this,
+                        FloatingService.class
+                );
+
+                intent.setAction("UPDATE_ALPHA");
+                intent.putExtra(
+                        "alpha",
+                        Math.max(30, Math.min(255, value))
+                );
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
+            });
         }
     }
 
     private void enableFloating() {
-        if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) {
-            enableAfterPermission = true;
-            Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-            startActivityForResult(i, OVERLAY_REQUEST);
-            Toast.makeText(this, "Izinkan LIXXZY AI tampil di atas aplikasi lain", Toast.LENGTH_LONG).show();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) {
+
+            Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName())
+            );
+
+            startActivityForResult(intent, OVERLAY_REQUEST);
+
+            Toast.makeText(
+                    this,
+                    "Izinkan tampil di atas aplikasi lain",
+                    Toast.LENGTH_LONG
+            ).show();
+
             return;
         }
-        getSharedPreferences("lixxzy", MODE_PRIVATE).edit().putBoolean("floating_enabled", true).apply();
-        Intent service = new Intent(this, FloatingService.class);
-        if (Build.VERSION.SDK_INT >= 26) startForegroundService(service); else startService(service);
-        Toast.makeText(this, "Jendela mengambang aktif", Toast.LENGTH_SHORT).show();
+
+        startFloatingService();
     }
 
-    private void stopFloating() {
-        getSharedPreferences("lixxzy", MODE_PRIVATE).edit().putBoolean("floating_enabled", false).apply();
-        stopService(new Intent(this, FloatingService.class));
-        Toast.makeText(this, "Jendela mengambang dimatikan", Toast.LENGTH_SHORT).show();
-    }
+    private void startFloatingService() {
+        Intent intent = new Intent(
+                this,
+                FloatingService.class
+        );
 
-    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == OVERLAY_REQUEST && enableAfterPermission) {
-            enableAfterPermission = false;
-            if (Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(this)) enableFloating();
-            else Toast.makeText(this, "Izin overlay belum diberikan", Toast.LENGTH_SHORT).show();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent);
+        } else {
+            startService(intent);
         }
     }
 
-    @Override public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack(); else super.onBackPressed();
+    @Override
+    protected void onActivityResult(
+            int requestCode,
+            int resultCode,
+            Intent data
+    ) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == OVERLAY_REQUEST) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                    || Settings.canDrawOverlays(this)) {
+                startFloatingService();
+            } else {
+                Toast.makeText(
+                        this,
+                        "Izin overlay belum diberikan",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        }
     }
-}
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webView != null) {
+            webView.stopLoading();
+            webView.destroy();
+            webView = null;
+        }
+
+        super.onDestroy();
+    }
+                    }
+                    
